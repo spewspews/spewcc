@@ -8,28 +8,28 @@ Avltree *types;
 int
 typcmp(Avl *a1, Avl *a2)
 {
-	Typ *t1, *t2, **c1, **c2;
+	Type *t1, *t2, **p1, **p2;
+	int cmp;
 
-	t1 = (Typ*)a1;
-	t2 = (Typ*)a2;
+	t1 = (Type*)a1;
+	t2 = (Type*)a2;
 
-	if(t1->t != t2->t)
-		return t1->t < t2->t;
+	if((cmp = memcmp(t1, t2, sizeof(Type))) != 0)
+		return cmp;
 
-	if(t1->q != t2->q)
-		return t1->q < t2->q;
-
-	if(t1->n != t2->n)
-		return t1->n < t2->n;
-
-	c1 = t1->c;
-	c2 = t2->c;
-	while(c1 < t1->c + t1->n) {
-		if(c1++ != c2++)
-			return (uintptr)*c1 < (uintptr)*c2;
+	p1 = t1->c;
+	p2 = t2->c;
+	for(;;) {
+		t1 = *p1++;
+		t2 = *p2++;
+		if(t1 != t2) {
+			if((uintptr)t1 < (uintptr)t2)
+				return -1;
+			return 1;
+		}
+		if(t1 == nil)
+			return 0;
 	}
-
-	return 0;
 }
 
 void
@@ -38,58 +38,78 @@ tinit(void)
 	types = avlcreate(typcmp);
 }
 
-Typ*
-typ(uchar t, uchar q, uchar n, Typ **ta)
+Type*
+type(uchar t, uchar q, uvlong a, Sym *tag, Type **ta)
 {
-	Typ k, *type;
+	static Type *k;
+	Type *typ;
+	int n;
 
-	k.t = t;
-	k.q = q;
-	k.n = n;
-	k.c = ta;
+	if(k == nil)
+		k = emallocz(sizeof(Type) + sizeof(Type*)*256);
 
-	type = (Typ*)avllookup(types, &k);
-	if(type != nil)
-		return type;
+	k->t = t;
+	k->q = q;
+	k->a = a;
+	k->tag = tag;
+	for(n = 0; ta[n] != nil; n++) {
+		if(n == 256)
+			yyerror("type: too many children");
+		k->c[n] = ta[n];
+	}
+	k->c[n] = nil;
 
-	type = emallocz(sizeof(Typ) + n*sizeof(Typ*));
-	type->t = t;
-	type->q = q;
-	type->n = n;
-	type->c = (Typ**)(type+1);
-	memcpy(type->c, ta, sizeof(Typ*)*n);
-	return type;
+	typ = (Type*)avllookup(types, k);
+	if(typ != nil)
+		return typ;
+
+	typ = emallocz(sizeof(Type) + n*sizeof(Type*));
+	typ->t = t;
+	typ->q = q;
+	typ->a = a;
+	typ->tag = tag;
+	memcpy(typ->c, ta, sizeof(Type*)*(n+1));
+	return typ;
 }
 
-Typ*
-pointer(int q, Typ *t)
+Type*
+tagtype(uchar t, uchar q, Sym *tag)
 {
-	return typ(TPTR, q, 1, &t); 
+	static Type *ta[1];
+
+	return type(t, q, 0, tag, ta);
 }
 
-Typ*
-record(int t, int q, int n, Typ **ta, Typ **tags)
+Type*
+array(int q, uvlong a, Type *t)
 {
-	Typ *type;
+	Type *ta[2];
 
-	type = typ(t, q, n, ta);
-	type->tags = ecalloc(n, sizeof(char*));
-	memcpy(type->tags, tags, sizeof(char*)*n);
-	return type;
+	ta[0] = t;
+	ta[1] = nil;
+	return type(TARRAY, q, a, nil, ta);
+}
+	
+Type*
+pointer(int q, Type *t)
+{
+	Type *ta[2];
+
+	ta[0] = t;
+	ta[1] = nil;
+	return type(TPTR, q, 0, nil, ta); 
 }
 
-Typ*
-function(uchar q, Typ *p, Typ *r)
+Type*
+basictype(uchar t, uchar q)
 {
-	Typ *ta[2];
+	static Type *ta[1];
 
-	ta[0] = p;
-	ta[1] = r;
-	return typ(TFUNC, q, 2, ta);
+	return type(t, q, 0, nil, ta);
 }
 
-Typ*
-basic(int t, uchar q)
+Type*
+record(uchar t, uchar q, Type **ta)
 {
-	return typ(t, q, 0, nil);
+	return type(t, q, 0, nil, ta);
 }

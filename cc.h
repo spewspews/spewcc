@@ -1,23 +1,23 @@
-typedef struct Typ Typ;
+typedef struct Type Type;
 typedef struct Sym Sym;
 typedef struct Nod Nod;
 
-struct Typ {
+struct Type {
 	Avl;
-	uchar t, q, n;
-	char **tags;
-	Typ **c;
+	uchar t, q;
+	uvlong a;
+	Sym *tag;
+	Type *c[1];
 };
 
 struct Sym {
 	Avl;
-	Sym *link;
+	Sym *link;	/* List for unions and structs */
 	char *name;
-	union {
-		Typ *typ;	/* LNAME LTYPED */
-		Sym *memb;	/* LTAG */
-	};
+	Type *typ;
+	Sym *memb;	/* List of members for union and structs. This might go away */
 	long lex;
+	long off;	/* offset for union or struct or auto var in function? */
 	uchar blk;
 	char cl;
 	char buf[1];
@@ -45,7 +45,7 @@ enum {
 };
 
 enum {
-	TNOTYPE,
+	TVOID,
 	TCHAR,
 	TSHORT,
 	TINT,
@@ -53,8 +53,20 @@ enum {
 	TVLONG,
 	TFLOAT,
 	TDOUBLE,
+	TUCHAR,
+	TUSHORT,
+	TUINT,
+	TULONG,
+	TUVLONG,
+	NBTYP,
+	TPTR = NBTYP,
+	TFUNC,
+	TARRAY,
+	TSTRUCT,
+	TUNION,
+	TENUM,
+	NTYP,
 	TDOT,
-	TPTR,
 	TAUTO,
 	TEXTERN,
 	TSTATIC,
@@ -64,18 +76,6 @@ enum {
 	TVOLATILE,
 	TUNSIGNED,
 	TSIGNED,
-	TUCHAR,
-	TUSHORT,
-	TUINT,
-	TULONG,
-	TUVLONG,
-	TFUNC,
-	TARRAY,
-	TVOID,
-	TSTRUCT,
-	TUNION,
-	TENUM,
-	NTYP,
 
 	KCONST = 0, /* at beginning since these are saved in type */
 	KVOLATILE,
